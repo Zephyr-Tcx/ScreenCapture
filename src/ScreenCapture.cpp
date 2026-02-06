@@ -1,3 +1,5 @@
+//v0.0.1 - 初始版本，基本功能实现
+
 #define UNICODE
 #define _UNICODE
 
@@ -666,3 +668,5 @@ void LoadSettings() {
     CheckDlgButton(g_hWnd, IDC_MINIMIZE_CHECK, 
                   (_wtoi(minimizeBuffer) == 1) ? BST_CHECKED : BST_UNCHECKED);
 }
+
+//v0.0.1 - 初始版本，基本功能实现
