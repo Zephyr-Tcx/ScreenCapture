@@ -1,3 +1,6 @@
+#define UNICODE
+#define _UNICODE
+
 #include <windows.h>
 #include <gdiplus.h>
 #include <commctrl.h>
@@ -47,6 +50,9 @@ std::mutex g_captureMutex;
 #define IDM_TRAY_MANUAL       114
 #define IDM_TRAY_TOGGLE       115
 
+// 自定义消息
+#define WM_TRAYICON (WM_USER + 100)
+
 // 函数声明
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 BOOL InitApplication(HINSTANCE hInstance);
@@ -64,6 +70,7 @@ void CreateTrayIcon(HWND hWnd);
 void RemoveTrayIcon(HWND hWnd);
 std::wstring GetTimestamp();
 std::wstring GetAppDataPath();
+int GetEncoderClsid(const WCHAR* format, CLSID* pClsid); // 添加这个声明
 
 // GDI+ 初始化
 GdiplusStartupInput g_gdiplusStartupInput;
@@ -132,7 +139,7 @@ BOOL InitApplication(HINSTANCE hInstance) {
 
 // 创建窗口和控件
 HWND InitInstance(HINSTANCE hInstance, int nCmdShow) {
-    g_hWnd = CreateWindow(
+    g_hWnd = CreateWindowW(
         L"ScreenCaptureClass",
         L"定时屏幕截图工具",
         WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
@@ -146,63 +153,63 @@ HWND InitInstance(HINSTANCE hInstance, int nCmdShow) {
     
     // 创建控件
     // 标签：截图间隔
-    CreateWindow(L"STATIC", L"截图间隔 (分钟):", 
+    CreateWindowW(L"STATIC", L"截图间隔 (分钟):", 
         WS_CHILD | WS_VISIBLE | SS_RIGHT,
         20, 20, 120, 25, g_hWnd, NULL, hInstance, NULL);
     
     // 编辑框：间隔时间
-    HWND hIntervalEdit = CreateWindow(L"EDIT", L"5",
+    HWND hIntervalEdit = CreateWindowW(L"EDIT", L"5",
         WS_CHILD | WS_VISIBLE | WS_BORDER | ES_NUMBER,
         150, 20, 80, 25, g_hWnd, (HMENU)IDC_INTERVAL_EDIT, hInstance, NULL);
     SendMessage(hIntervalEdit, EM_SETLIMITTEXT, 4, 0);
     
     // 按钮：开始/停止截图
-    CreateWindow(L"BUTTON", L"开始截图",
+    CreateWindowW(L"BUTTON", L"开始截图",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         250, 20, 100, 25, g_hWnd, (HMENU)IDC_START_BTN, hInstance, NULL);
     
     // 按钮：手动截图
-    CreateWindow(L"BUTTON", L"立即截图",
+    CreateWindowW(L"BUTTON", L"立即截图",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         370, 20, 100, 25, g_hWnd, (HMENU)IDC_MANUAL_BTN, hInstance, NULL);
     
     // 标签：保存目录
-    CreateWindow(L"STATIC", L"保存目录:", 
+    CreateWindowW(L"STATIC", L"保存目录:", 
         WS_CHILD | WS_VISIBLE | SS_RIGHT,
         20, 60, 120, 25, g_hWnd, NULL, hInstance, NULL);
     
     // 编辑框：保存路径
-    CreateWindow(L"EDIT", L"",
+    CreateWindowW(L"EDIT", L"",
         WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
         150, 60, 290, 25, g_hWnd, (HMENU)IDC_PATH_EDIT, hInstance, NULL);
     
     // 按钮：浏览目录
-    CreateWindow(L"BUTTON", L"浏览...",
+    CreateWindowW(L"BUTTON", L"浏览...",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         450, 60, 60, 25, g_hWnd, (HMENU)IDC_BROWSE_BTN, hInstance, NULL);
     
     // 标签：显示器选择
-    CreateWindow(L"STATIC", L"选择显示器:", 
+    CreateWindowW(L"STATIC", L"选择显示器:", 
         WS_CHILD | WS_VISIBLE | SS_RIGHT,
         20, 100, 120, 25, g_hWnd, NULL, hInstance, NULL);
     
     // 下拉框：显示器列表
-    HWND hDisplayCombo = CreateWindow(L"COMBOBOX", L"",
+    HWND hDisplayCombo = CreateWindowW(L"COMBOBOX", L"",
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
         150, 100, 200, 200, g_hWnd, (HMENU)IDC_DISPLAY_COMBO, hInstance, NULL);
     
     // 复选框：最小化到托盘
-    CreateWindow(L"BUTTON", L"最小化到系统托盘",
+    CreateWindowW(L"BUTTON", L"最小化到系统托盘",
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
         150, 140, 200, 25, g_hWnd, (HMENU)IDC_MINIMIZE_CHECK, hInstance, NULL);
     
     // 状态文本
-    CreateWindow(L"STATIC", L"状态: 就绪",
+    CreateWindowW(L"STATIC", L"状态: 就绪",
         WS_CHILD | WS_VISIBLE | SS_LEFT,
         20, 180, 450, 25, g_hWnd, (HMENU)IDC_STATUS_TEXT, hInstance, NULL);
     
     // 计数文本
-    CreateWindow(L"STATIC", L"已截图: 0 次",
+    CreateWindowW(L"STATIC", L"已截图: 0 次",
         WS_CHILD | WS_VISIBLE | SS_CENTER,
         20, 210, 450, 25, g_hWnd, (HMENU)IDC_COUNT_TEXT, hInstance, NULL);
     
@@ -295,18 +302,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
             GetCursorPos(&pt);
             
             HMENU hMenu = CreatePopupMenu();
-            AppendMenu(hMenu, MF_STRING, IDM_TRAY_SHOW, L"显示窗口");
-            AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-            AppendMenu(hMenu, MF_STRING, IDM_TRAY_MANUAL, L"手动截图");
+            AppendMenuW(hMenu, MF_STRING, IDM_TRAY_SHOW, L"显示窗口");
+            AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenuW(hMenu, MF_STRING, IDM_TRAY_MANUAL, L"手动截图");
             
             if (g_bCapturing) {
-                AppendMenu(hMenu, MF_STRING, IDM_TRAY_TOGGLE, L"停止截图");
+                AppendMenuW(hMenu, MF_STRING, IDM_TRAY_TOGGLE, L"停止截图");
             } else {
-                AppendMenu(hMenu, MF_STRING, IDM_TRAY_TOGGLE, L"开始截图");
+                AppendMenuW(hMenu, MF_STRING, IDM_TRAY_TOGGLE, L"开始截图");
             }
             
-            AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-            AppendMenu(hMenu, MF_STRING, IDM_TRAY_EXIT, L"退出");
+            AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenuW(hMenu, MF_STRING, IDM_TRAY_EXIT, L"退出");
             
             SetForegroundWindow(hWnd);
             TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hWnd, NULL);
@@ -328,27 +335,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 // 更新状态文本
 void UpdateStatus(const std::wstring& text) {
     std::wstring status = L"状态: " + text;
-    SetDlgItemText(g_hWnd, IDC_STATUS_TEXT, status.c_str());
+    SetDlgItemTextW(g_hWnd, IDC_STATUS_TEXT, status.c_str());
 }
 
 // 更新计数文本
 void UpdateCountText() {
     std::wstring count = L"已截图: " + std::to_wstring(g_nCaptureCount) + L" 次";
-    SetDlgItemText(g_hWnd, IDC_COUNT_TEXT, count.c_str());
+    SetDlgItemTextW(g_hWnd, IDC_COUNT_TEXT, count.c_str());
 }
 
 // 浏览保存目录
 void BrowseSaveDirectory() {
-    BROWSEINFO bi = { 0 };
+    BROWSEINFOW bi = { 0 };
     bi.lpszTitle = L"选择截图保存目录";
     bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
     
-    LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
+    LPITEMIDLIST pidl = SHBrowseForFolderW(&bi);
     if (pidl != 0) {
         wchar_t path[MAX_PATH];
-        if (SHGetPathFromIDList(pidl, path)) {
+        if (SHGetPathFromIDListW(pidl, path)) {
             g_savePath = path;
-            SetDlgItemText(g_hWnd, IDC_PATH_EDIT, path);
+            SetDlgItemTextW(g_hWnd, IDC_PATH_EDIT, path);
         }
         CoTaskMemFree(pidl);
     }
@@ -368,10 +375,35 @@ std::wstring GetTimestamp() {
 // 获取应用程序数据路径
 std::wstring GetAppDataPath() {
     wchar_t path[MAX_PATH];
-    if (SHGetFolderPath(NULL, CSIDL_MYDOCUMENTS, NULL, 0, path) == S_OK) {
+    if (SHGetFolderPathW(NULL, CSIDL_MYDOCUMENTS, NULL, 0, path) == S_OK) {
         return std::wstring(path) + L"\\ScreenCaptures";
     }
     return L"C:\\ScreenCaptures";
+}
+
+// 获取PNG编码器的CLSID
+int GetEncoderClsid(const WCHAR* format, CLSID* pClsid) {
+    UINT num = 0;
+    UINT size = 0;
+    
+    GetImageEncodersSize(&num, &size);
+    if (size == 0) return -1;
+    
+    ImageCodecInfo* pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
+    if (pImageCodecInfo == NULL) return -1;
+    
+    GetImageEncoders(num, size, pImageCodecInfo);
+    
+    for (UINT j = 0; j < num; ++j) {
+        if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0) {
+            *pClsid = pImageCodecInfo[j].Clsid;
+            free(pImageCodecInfo);
+            return j;
+        }
+    }
+    
+    free(pImageCodecInfo);
+    return -1;
 }
 
 // 截图函数
@@ -380,16 +412,16 @@ void CaptureScreen(bool manual) {
     
     // 获取保存路径
     wchar_t pathBuffer[MAX_PATH];
-    GetDlgItemText(g_hWnd, IDC_PATH_EDIT, pathBuffer, MAX_PATH);
+    GetDlgItemTextW(g_hWnd, IDC_PATH_EDIT, pathBuffer, MAX_PATH);
     std::wstring savePath = pathBuffer;
     
     if (savePath.empty()) {
         savePath = GetAppDataPath();
-        SetDlgItemText(g_hWnd, IDC_PATH_EDIT, savePath.c_str());
+        SetDlgItemTextW(g_hWnd, IDC_PATH_EDIT, savePath.c_str());
     }
     
     // 创建目录（如果不存在）
-    CreateDirectory(savePath.c_str(), NULL);
+    CreateDirectoryW(savePath.c_str(), NULL);
     
     // 生成文件名
     std::wstring timestamp = GetTimestamp();
@@ -416,6 +448,8 @@ void CaptureScreen(bool manual) {
         Bitmap bitmap(hBitmap, NULL);
         CLSID pngClsid;
         GetEncoderClsid(L"image/png", &pngClsid);
+        
+        // 使用宽字符版本保存
         bitmap.Save(fullPath.c_str(), &pngClsid, NULL);
         
         // 清理资源
@@ -425,11 +459,11 @@ void CaptureScreen(bool manual) {
     } else {
         // 截取特定显示器
         DISPLAY_DEVICE displayDevice = g_displays[g_selectedDisplay - 1];
-        DEVMODE devMode;
-        devMode.dmSize = sizeof(DEVMODE);
-        EnumDisplaySettings(displayDevice.DeviceName, ENUM_CURRENT_SETTINGS, &devMode);
+        DEVMODEW devMode;
+        devMode.dmSize = sizeof(DEVMODEW);
+        EnumDisplaySettingsW(displayDevice.DeviceName, ENUM_CURRENT_SETTINGS, &devMode);
         
-        HDC hdcScreen = CreateDC(L"DISPLAY", displayDevice.DeviceName, NULL, NULL);
+        HDC hdcScreen = CreateDCW(L"DISPLAY", displayDevice.DeviceName, NULL, NULL);
         HDC hdcMem = CreateCompatibleDC(hdcScreen);
         
         int screenWidth = devMode.dmPelsWidth;
@@ -460,7 +494,7 @@ void CaptureScreen(bool manual) {
     UpdateStatus(status);
     
     // 显示系统通知
-    NOTIFYICONDATA nid = { sizeof(NOTIFYICONDATA) };
+    NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
     nid.hWnd = g_hWnd;
     nid.uID = IDC_TRAY_ICON;
     nid.uFlags = NIF_INFO;
@@ -468,14 +502,14 @@ void CaptureScreen(bool manual) {
     wcscpy_s(nid.szInfo, L"截图已保存到指定目录");
     nid.dwInfoFlags = NIIF_INFO;
     nid.uTimeout = 3000;
-    Shell_NotifyIcon(NIM_MODIFY, &nid);
+    Shell_NotifyIconW(NIM_MODIFY, &nid);
 }
 
 // 开始截图
 void StartCapture() {
     // 获取间隔时间
     wchar_t intervalBuffer[10];
-    GetDlgItemText(g_hWnd, IDC_INTERVAL_EDIT, intervalBuffer, 10);
+    GetDlgItemTextW(g_hWnd, IDC_INTERVAL_EDIT, intervalBuffer, 10);
     g_intervalMinutes = _wtoi(intervalBuffer);
     
     if (g_intervalMinutes <= 0) {
@@ -487,7 +521,7 @@ void StartCapture() {
     SetTimer(g_hWnd, IDC_TIMER_ID, g_intervalMinutes * 60 * 1000, NULL);
     g_bCapturing = true;
     
-    SetDlgItemText(g_hWnd, IDC_START_BTN, L"停止截图");
+    SetDlgItemTextW(g_hWnd, IDC_START_BTN, L"停止截图");
     UpdateStatus(L"定时截图已启动");
     
     // 立即截取第一张
@@ -499,7 +533,7 @@ void StopCapture() {
     KillTimer(g_hWnd, IDC_TIMER_ID);
     g_bCapturing = false;
     
-    SetDlgItemText(g_hWnd, IDC_START_BTN, L"开始截图");
+    SetDlgItemTextW(g_hWnd, IDC_START_BTN, L"开始截图");
     UpdateStatus(L"定时截图已停止");
 }
 
@@ -514,11 +548,11 @@ void ToggleCapture() {
 
 // 更新显示器列表
 void UpdateDisplayList(HWND hCombo) {
-    SendMessage(hCombo, CB_RESETCONTENT, 0, 0);
+    SendMessageW(hCombo, CB_RESETCONTENT, 0, 0);
     
     // 添加"所有显示器"选项
-    SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)L"所有显示器");
-    SendMessage(hCombo, CB_SETCURSEL, 0, 0);
+    SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"所有显示器");
+    SendMessageW(hCombo, CB_SETCURSEL, 0, 0);
     
     // 枚举所有显示器
     DISPLAY_DEVICE displayDevice;
@@ -526,60 +560,35 @@ void UpdateDisplayList(HWND hCombo) {
     
     g_displays.clear();
     
-    for (int i = 0; EnumDisplayDevices(NULL, i, &displayDevice, 0); i++) {
+    for (int i = 0; EnumDisplayDevicesW(NULL, i, &displayDevice, 0); i++) {
         if (displayDevice.StateFlags & DISPLAY_DEVICE_ACTIVE) {
             // 获取显示器设置
-            DEVMODE devMode;
-            devMode.dmSize = sizeof(DEVMODE);
-            EnumDisplaySettings(displayDevice.DeviceName, ENUM_CURRENT_SETTINGS, &devMode);
+            DEVMODEW devMode;
+            devMode.dmSize = sizeof(DEVMODEW);
+            EnumDisplaySettingsW(displayDevice.DeviceName, ENUM_CURRENT_SETTINGS, &devMode);
             
             // 构建显示器描述
             std::wstring desc = displayDevice.DeviceString;
             desc += L" (" + std::to_wstring(devMode.dmPelsWidth) + 
                     L"x" + std::to_wstring(devMode.dmPelsHeight) + L")";
             
-            SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)desc.c_str());
+            SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)desc.c_str());
             g_displays.push_back(displayDevice);
         }
     }
 }
 
-// 获取PNG编码器的CLSID
-int GetEncoderClsid(const WCHAR* format, CLSID* pClsid) {
-    UINT num = 0;
-    UINT size = 0;
-    
-    GetImageEncodersSize(&num, &size);
-    if (size == 0) return -1;
-    
-    ImageCodecInfo* pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
-    if (pImageCodecInfo == NULL) return -1;
-    
-    GetImageEncoders(num, size, pImageCodecInfo);
-    
-    for (UINT j = 0; j < num; ++j) {
-        if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0) {
-            *pClsid = pImageCodecInfo[j].Clsid;
-            free(pImageCodecInfo);
-            return j;
-        }
-    }
-    
-    free(pImageCodecInfo);
-    return -1;
-}
-
 // 创建系统托盘图标
 void CreateTrayIcon(HWND hWnd) {
-    NOTIFYICONDATA nid = { sizeof(NOTIFYICONDATA) };
+    NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
     nid.hWnd = hWnd;
     nid.uID = IDC_TRAY_ICON;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
-    nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    nid.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
     wcscpy_s(nid.szTip, L"定时屏幕截图工具");
     
-    Shell_NotifyIcon(NIM_ADD, &nid);
+    Shell_NotifyIconW(NIM_ADD, &nid);
     
     if (nid.hIcon) {
         DestroyIcon(nid.hIcon);
@@ -588,11 +597,11 @@ void CreateTrayIcon(HWND hWnd) {
 
 // 移除系统托盘图标
 void RemoveTrayIcon(HWND hWnd) {
-    NOTIFYICONDATA nid = { sizeof(NOTIFYICONDATA) };
+    NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
     nid.hWnd = hWnd;
     nid.uID = IDC_TRAY_ICON;
     
-    Shell_NotifyIcon(NIM_DELETE, &nid);
+    Shell_NotifyIconW(NIM_DELETE, &nid);
 }
 
 // 保存设置
@@ -601,22 +610,22 @@ void SaveSettings() {
     
     // 保存保存路径
     wchar_t pathBuffer[MAX_PATH];
-    GetDlgItemText(g_hWnd, IDC_PATH_EDIT, pathBuffer, MAX_PATH);
-    WritePrivateProfileString(L"Settings", L"SavePath", pathBuffer, iniPath.c_str());
+    GetDlgItemTextW(g_hWnd, IDC_PATH_EDIT, pathBuffer, MAX_PATH);
+    WritePrivateProfileStringW(L"Settings", L"SavePath", pathBuffer, iniPath.c_str());
     
     // 保存间隔时间
     wchar_t intervalBuffer[10];
-    GetDlgItemText(g_hWnd, IDC_INTERVAL_EDIT, intervalBuffer, 10);
-    WritePrivateProfileString(L"Settings", L"Interval", intervalBuffer, iniPath.c_str());
+    GetDlgItemTextW(g_hWnd, IDC_INTERVAL_EDIT, intervalBuffer, 10);
+    WritePrivateProfileStringW(L"Settings", L"Interval", intervalBuffer, iniPath.c_str());
     
     // 保存显示器选择
-    int displayIndex = (int)SendDlgItemMessage(g_hWnd, IDC_DISPLAY_COMBO, CB_GETCURSEL, 0, 0);
-    WritePrivateProfileString(L"Settings", L"Display", 
+    int displayIndex = (int)SendDlgItemMessageW(g_hWnd, IDC_DISPLAY_COMBO, CB_GETCURSEL, 0, 0);
+    WritePrivateProfileStringW(L"Settings", L"Display", 
                               std::to_wstring(displayIndex).c_str(), iniPath.c_str());
     
     // 保存复选框状态
     BOOL minimizeToTray = IsDlgButtonChecked(g_hWnd, IDC_MINIMIZE_CHECK);
-    WritePrivateProfileString(L"Settings", L"MinimizeToTray", 
+    WritePrivateProfileStringW(L"Settings", L"MinimizeToTray", 
                               minimizeToTray ? L"1" : L"0", iniPath.c_str());
 }
 
@@ -627,32 +636,32 @@ void LoadSettings() {
     
     // 加载保存路径
     wchar_t pathBuffer[MAX_PATH];
-    GetPrivateProfileString(L"Settings", L"SavePath", defaultPath.c_str(), 
+    GetPrivateProfileStringW(L"Settings", L"SavePath", defaultPath.c_str(), 
                            pathBuffer, MAX_PATH, iniPath.c_str());
     g_savePath = pathBuffer;
-    SetDlgItemText(g_hWnd, IDC_PATH_EDIT, pathBuffer);
+    SetDlgItemTextW(g_hWnd, IDC_PATH_EDIT, pathBuffer);
     
     // 创建目录
-    CreateDirectory(pathBuffer, NULL);
+    CreateDirectoryW(pathBuffer, NULL);
     
     // 加载间隔时间
     wchar_t intervalBuffer[10];
-    GetPrivateProfileString(L"Settings", L"Interval", L"5", 
+    GetPrivateProfileStringW(L"Settings", L"Interval", L"5", 
                            intervalBuffer, 10, iniPath.c_str());
-    SetDlgItemText(g_hWnd, IDC_INTERVAL_EDIT, intervalBuffer);
+    SetDlgItemTextW(g_hWnd, IDC_INTERVAL_EDIT, intervalBuffer);
     g_intervalMinutes = _wtoi(intervalBuffer);
     
     // 加载显示器选择
     wchar_t displayBuffer[10];
-    GetPrivateProfileString(L"Settings", L"Display", L"0", 
+    GetPrivateProfileStringW(L"Settings", L"Display", L"0", 
                            displayBuffer, 10, iniPath.c_str());
     int displayIndex = _wtoi(displayBuffer);
-    SendDlgItemMessage(g_hWnd, IDC_DISPLAY_COMBO, CB_SETCURSEL, displayIndex, 0);
+    SendDlgItemMessageW(g_hWnd, IDC_DISPLAY_COMBO, CB_SETCURSEL, displayIndex, 0);
     g_selectedDisplay = displayIndex;
     
     // 加载复选框状态
     wchar_t minimizeBuffer[10];
-    GetPrivateProfileString(L"Settings", L"MinimizeToTray", L"1", 
+    GetPrivateProfileStringW(L"Settings", L"MinimizeToTray", L"1", 
                            minimizeBuffer, 10, iniPath.c_str());
     CheckDlgButton(g_hWnd, IDC_MINIMIZE_CHECK, 
                   (_wtoi(minimizeBuffer) == 1) ? BST_CHECKED : BST_UNCHECKED);
