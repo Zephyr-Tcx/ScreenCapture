@@ -1,0 +1,173 @@
+// =========================================
+// ScreenCaptureTool.rc
+// 使用Windows系统内置图标的版本
+// =========================================
+
+#include <windows.h>
+#include "Resource.h"
+
+// =========================================
+// 1. 图标资源 - 使用系统内置图标
+// =========================================
+
+// 主程序图标 - 使用默认应用程序图标
+IDI_MAIN_ICON       ICON        IDI_APPLICATION
+
+// 系统托盘图标 - 使用信息图标（蓝色i）
+IDI_TRAY_ICON       ICON        IDI_INFORMATION
+
+// 开始按钮图标 - 使用Windows徽标（类似播放）
+IDI_PLAY_ICON       ICON        IDI_WINLOGO
+
+// 停止按钮图标 - 使用错误图标（红色×）
+IDI_STOP_ICON       ICON        IDI_ERROR
+
+// 立即截图图标 - 使用警告图标（黄色!）
+IDI_CAMERA_ICON     ICON        IDI_WARNING
+
+// =========================================
+// 2. 字符串表资源
+// =========================================
+
+STRINGTABLE
+BEGIN
+    // 应用程序标题和名称
+    IDS_APP_TITLE           "屏幕截图工具"
+    IDS_APP_NAME            "Screen Capture Tool"
+    
+    // 状态消息
+    IDS_STATUS_READY        "就绪"
+    IDS_STATUS_CAPTURING    "正在截图中..."
+    IDS_STATUS_STOPPED      "已停止"
+    IDS_STATUS_SAVED        "截图已保存"
+    
+    // 按钮文本
+    IDS_BTN_START           "开始截图"
+    IDS_BTN_STOP            "停止截图"
+    IDS_BTN_MANUAL          "立即截图"
+    IDS_BTN_BROWSE          "浏览..."
+    
+    // 标签文本
+    IDS_LABEL_INTERVAL      "截图间隔（分钟）"
+    IDS_LABEL_PATH          "保存路径"
+    IDS_LABEL_DISPLAY       "选择显示器"
+    IDS_LABEL_FORMAT        "图片格式"
+    IDS_LABEL_QUALITY       "图片质量"
+    
+    // 菜单文本
+    IDS_MENU_EXIT           "退出"
+    IDS_MENU_SHOW           "显示窗口"
+    IDS_MENU_HIDE           "隐藏窗口"
+    IDS_MENU_MANUAL         "手动截图"
+    IDS_MENU_TOGGLE_START   "开始截图"
+    IDS_MENU_TOGGLE_STOP    "停止截图"
+    
+    // 格式选项
+    IDS_FORMAT_PNG          "PNG (推荐)"
+    IDS_FORMAT_JPEG         "JPEG"
+    IDS_FORMAT_BMP          "BMP"
+    
+    // 显示器选项
+    IDS_DISPLAY_ALL         "所有显示器"
+    
+    // 通知文本
+    IDS_NOTIFY_CAPTURE_OK   "截图保存成功"
+    IDS_NOTIFY_CAPTURE_ERR  "截图保存失败"
+END
+
+// =========================================
+// 3. 版本信息资源
+// =========================================
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     1,0,0,1
+PRODUCTVERSION  1,0,0,1
+FILEFLAGSMASK   0x3fL
+
+#ifdef _DEBUG
+    FILEFLAGS   VS_FF_DEBUG
+#else
+    FILEFLAGS   0x0L
+#endif
+
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     0x0L
+
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        // 中文（简体）版本信息
+        BLOCK "080404B0"  // 语言：中文（中国） 代码页：UTF-16
+        BEGIN
+            VALUE "CompanyName",        "个人开发项目\0"
+            VALUE "FileDescription",    "定时屏幕截图工具\0"
+            VALUE "FileVersion",        "1.0.0.1\0"
+            VALUE "InternalName",       "ScreenCaptureTool\0"
+            VALUE "LegalCopyright",     "版权所有 (C) 2024\0"
+            VALUE "OriginalFilename",   "ScreenCaptureTool.exe\0"
+            VALUE "ProductName",        "屏幕截图工具\0"
+            VALUE "ProductVersion",     "1.0.0.1\0"
+            
+            // 可选的额外信息
+            VALUE "Comments",           "自动定时截图，支持多显示器\0"
+            VALUE "ProductDescription", "简单易用的屏幕截图工具\0"
+            VALUE "BuildDate",          __DATE__ "\0"
+            VALUE "BuildTime",          __TIME__ "\0"
+        END
+        
+        // 英文版本信息
+        BLOCK "040904E4"  // 语言：英文（美国） 代码页：UTF-16
+        BEGIN
+            VALUE "CompanyName",        "Personal Project\0"
+            VALUE "FileDescription",    "Automatic Screen Capture Tool\0"
+            VALUE "FileVersion",        "1.0.0.1\0"
+            VALUE "InternalName",       "ScreenCaptureTool\0"
+            VALUE "LegalCopyright",     "Copyright (C) 2024\0"
+            VALUE "OriginalFilename",   "ScreenCaptureTool.exe\0"
+            VALUE "ProductName",        "Screen Capture Tool\0"
+            VALUE "ProductVersion",     "1.0.0.1\0"
+            
+            VALUE "Comments",           "Automatic timed screenshots with multi-display support\0"
+            VALUE "ProductDescription", "Easy-to-use screen capture utility\0"
+            VALUE "BuildDate",          __DATE__ "\0"
+            VALUE "BuildTime",          __TIME__ "\0"
+        END
+    END
+    
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 1200   // 中文（中国）
+        VALUE "Translation", 0x409, 1200   // 英文（美国）
+    END
+END
+
+// =========================================
+// 4. 清单文件资源（可选，用于现代UI）
+// =========================================
+
+// Windows 10/11 现代UI支持
+// 1 RT_MANIFEST "ScreenCaptureTool.manifest"
+
+// =========================================
+// 5. 对话框资源（可选，可用于错误提示等）
+// =========================================
+
+// 示例：错误对话框（如果需要的话）
+/*
+IDD_ERROR_DIALOG DIALOGEX 0, 0, 200, 100
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "错误"
+FONT 9, "Segoe UI"
+BEGIN
+    CTEXT    "发生错误，请重试。", IDC_ERROR_TEXT, 10, 20, 180, 30
+    DEFPUSHBUTTON "确定", IDOK, 70, 60, 60, 20
+END
+*/
+
+// =========================================
+// 6. 鼠标光标资源（可选）
+// =========================================
+
+// 如果需要自定义鼠标光标
+// IDC_CUSTOM_CURSOR CURSOR "custom_cursor.cur"
